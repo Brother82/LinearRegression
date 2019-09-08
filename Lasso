@@ -1,0 +1,60 @@
+import pandas as pd
+import math
+import numpy as np
+from sklearn import preprocessing # for scaling data
+from sklearn import cross_validation
+from sklearn.linear_model import LinearRegression, Lasso
+import datetime
+import matplotlib.pyplot as plt
+from matplotlib import style
+
+#import data
+MSFT_raw = pd.read_csv("C:\BI\Course Machine Learning\MSFT.csv", error_bad_lines=False)
+
+df = MSFT_raw[['Open', 'High', 'Low', 'Close', 'Volume']]
+df['High_Low_PCT'] = (df['High'] - df['Close']) / df['Close'] * 100.0 # High Low %
+df['Percent_Change'] = (df['Close'] - df['Open']) / df['Open'] * 100.0 # % change in stock prices
+
+df = df[['Close', 'High_Low_PCT', 'Percent_Change', 'Volume']] # We only care about these features.
+
+forecast_column = 'Close'
+
+#preprossing
+df.fillna(-112233, inplace=True)
+how_many_days = int(math.ceil(0.01 * len(df))) # we want these number of days to predict for, next.
+df['label'] = df[forecast_column].shift(-how_many_days) # shift a few rows above
+
+print(how_many_days)
+
+X = np.array(df.drop(['label'], axis=1)) # X are features, so take everything except label
+y = np.array(df['label'])
+X = preprocessing.scale(X) # subtracts the mean and divides by the standard deviation of your dataset along a given axis
+y = np.delete(y, [249,250,251,252])
+count_y = len(y) 
+print(count_y)
+# Seperate data to predict upon
+X_lately = X[-how_many_days:] # voorspelling
+X = X[:-how_many_days] #voor dataframe training
+df.dropna(inplace=True)
+
+# Train and test set split: 80-20
+X_train, X_test, y_train, y_test = cross_validation.train_test_split(X, y, test_size=0.2)
+clf = Lasso(alpha=0.1)
+clf.fit(X_train, y_train)
+
+accuracy = clf.score(X_test, y_test)
+stock_prediction = clf.predict(X_lately) # to predict the next how_many_days days
+
+print('Next {0} days prediction: {1}'.format(how_many_days, stock_prediction))
+print(accuracy)
+
+
+#grafieken
+df['Stock Forecast'] = np.nan
+    
+df['Close'].plot()
+df['Stock Forecast'].plot()
+plt.legend(loc=4)
+plt.xlabel('Date')
+plt.ylabel('Price')
+plt.show()
